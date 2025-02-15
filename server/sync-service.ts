@@ -11,8 +11,10 @@ export class SyncService {
   }
 
   start() {
-    // Check for updates every 5 minutes
-    this.syncInterval = setInterval(() => this.checkForUpdates(), 5 * 60 * 1000);
+    // Check for updates every minute
+    this.syncInterval = setInterval(() => this.checkForUpdates(), 60 * 1000);
+    // Do an initial sync
+    this.checkForUpdates();
   }
 
   stop() {
@@ -24,50 +26,9 @@ export class SyncService {
   private async checkForUpdates() {
     try {
       const feeds = await storage.getFeeds();
-      
+
       for (const feed of feeds) {
-        const events = await parseCalendarUrl(feed.url);
-        const todos = await storage.getTodos(feed.id);
-        
-        // Check for new or updated events
-        for (const event of events) {
-          const existingTodo = todos.find(todo => todo.eventUid === event.uid);
-          
-          if (!existingTodo) {
-            // New event, create todo
-            await storage.createTodo({
-              title: event.summary,
-              description: event.description,
-              dueDate: event.start,
-              completed: false,
-              feedId: feed.id,
-              eventUid: event.uid,
-            });
-            
-            this.wsNotifier(feed.userId, feed.id, events);
-          } else if (
-            new Date(existingTodo.dueDate!).getTime() !== event.start.getTime() ||
-            existingTodo.title !== event.summary ||
-            existingTodo.description !== event.description
-          ) {
-            // Event updated, update todo
-            await storage.updateTodo(existingTodo.id, {
-              title: event.summary,
-              description: event.description,
-              dueDate: event.start,
-            });
-            
-            this.wsNotifier(feed.userId, feed.id, events);
-          }
-        }
-        
-        // Check for deleted events
-        for (const todo of todos) {
-          if (todo.eventUid && !events.find(event => event.uid === todo.eventUid)) {
-            await storage.deleteTodo(todo.id);
-            this.wsNotifier(feed.userId, feed.id, events);
-          }
-        }
+        await this.syncFeed(feed.id);
       }
     } catch (error) {
       console.error('Error syncing calendars:', error);
@@ -76,12 +37,56 @@ export class SyncService {
 
   // Manual sync for immediate update
   async syncFeed(feedId: number) {
-    const feed = await storage.getFeed(feedId);
-    if (feed) {
+    try {
+      const feed = await storage.getFeed(feedId);
+      if (!feed) return [];
+
       const events = await parseCalendarUrl(feed.url);
+      const todos = await storage.getTodos(feed.id);
+
+      // Check for new or updated events
+      for (const event of events) {
+        const existingTodo = todos.find(todo => todo.eventUid === event.uid);
+
+        if (!existingTodo) {
+          // New event, create todo
+          await storage.createTodo({
+            title: event.summary,
+            description: event.description || "",
+            dueDate: event.start,
+            completed: false,
+            feedId: feed.id,
+            eventUid: event.uid,
+          });
+          console.log(`Created new todo for event: ${event.summary}`);
+        } else if (
+          existingTodo.dueDate?.getTime() !== event.start.getTime() ||
+          existingTodo.title !== event.summary ||
+          existingTodo.description !== event.description
+        ) {
+          // Event updated, update todo
+          await storage.updateTodo(existingTodo.id, {
+            title: event.summary,
+            description: event.description || "",
+            dueDate: event.start,
+          });
+          console.log(`Updated todo for event: ${event.summary}`);
+        }
+      }
+
+      // Check for deleted events
+      for (const todo of todos) {
+        if (todo.eventUid && !events.find(event => event.uid === todo.eventUid)) {
+          await storage.deleteTodo(todo.id);
+          console.log(`Deleted todo for removed event: ${todo.title}`);
+        }
+      }
+
       this.wsNotifier(feed.userId, feed.id, events);
       return events;
+    } catch (error) {
+      console.error(`Error syncing feed ${feedId}:`, error);
+      return [];
     }
-    return [];
   }
 }
