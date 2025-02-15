@@ -4,15 +4,29 @@ import { storage } from "./storage";
 import { insertCalendarFeedSchema, insertTodoSchema } from "@shared/schema";
 import { z } from "zod";
 import { parseCalendarUrl } from "../client/src/lib/ical";
+import { setupAuth } from "./auth";
+
+// Middleware to check if user is authenticated
+const isAuthenticated = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  next();
+};
 
 export async function registerRoutes(app: Express) {
-  // Calendar Feed Routes
-  app.get("/api/feeds", async (_req, res) => {
+  // Set up authentication routes
+  setupAuth(app);
+
+  // Protected Calendar Feed Routes
+  app.get("/api/feeds", isAuthenticated, async (req, res) => {
     const feeds = await storage.getFeeds();
-    res.json(feeds);
+    // Filter feeds by user
+    const userFeeds = feeds.filter(feed => feed.userId === req.user!.id);
+    res.json(userFeeds);
   });
 
-  app.post("/api/feeds", async (req, res) => {
+  app.post("/api/feeds", isAuthenticated, async (req, res) => {
     const result = insertCalendarFeedSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: "Invalid feed data" });
@@ -20,7 +34,10 @@ export async function registerRoutes(app: Express) {
 
     try {
       const events = await parseCalendarUrl(result.data.url);
-      const feed = await storage.createFeed(result.data);
+      const feed = await storage.createFeed({
+        ...result.data,
+        userId: req.user!.id,
+      });
 
       // Create todos from events
       for (const event of events) {
@@ -40,8 +57,14 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/feeds/:id", async (req, res) => {
+  app.delete("/api/feeds/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
+    const feed = await storage.getFeed(id);
+
+    if (!feed || feed.userId !== req.user!.id) {
+      return res.status(404).json({ error: "Feed not found" });
+    }
+
     const deleted = await storage.deleteFeed(id);
     if (!deleted) {
       return res.status(404).json({ error: "Feed not found" });
@@ -49,18 +72,37 @@ export async function registerRoutes(app: Express) {
     res.json({ success: true });
   });
 
-  // Todo Routes
-  app.get("/api/todos", async (req, res) => {
+  // Protected Todo Routes
+  app.get("/api/todos", isAuthenticated, async (req, res) => {
     const feedId = req.query.feedId ? parseInt(req.query.feedId as string) : undefined;
+
+    if (feedId) {
+      const feed = await storage.getFeed(feedId);
+      if (!feed || feed.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Feed not found" });
+      }
+    }
+
     const todos = await storage.getTodos(feedId);
     res.json(todos);
   });
 
-  app.patch("/api/todos/:id", async (req, res) => {
+  app.patch("/api/todos/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
     const result = insertTodoSchema.partial().safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: "Invalid todo data" });
+    }
+
+    const todo = await storage.getTodo(id);
+    if (!todo) {
+      return res.status(404).json({ error: "Todo not found" });
+    }
+
+    // Check if the todo belongs to a feed owned by the user
+    const feed = await storage.getFeed(todo.feedId!);
+    if (!feed || feed.userId !== req.user!.id) {
+      return res.status(403).json({ error: "Unauthorized" });
     }
 
     const updated = await storage.updateTodo(id, result.data);

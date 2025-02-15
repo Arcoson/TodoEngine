@@ -1,12 +1,17 @@
-import { calendarFeeds, todos, type CalendarFeed, type Todo, type InsertCalendarFeed, type InsertTodo } from "@shared/schema";
+import { calendarFeeds, todos, users, type CalendarFeed, type Todo, type InsertCalendarFeed, type InsertTodo, type User, type InsertUser } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
 export interface IStorage {
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
   // Calendar Feed operations
   getFeeds(): Promise<CalendarFeed[]>;
   getFeed(id: number): Promise<CalendarFeed | undefined>;
-  createFeed(feed: InsertCalendarFeed): Promise<CalendarFeed>;
+  createFeed(feed: InsertCalendarFeed & { userId: number }): Promise<CalendarFeed>;
   deleteFeed(id: number): Promise<boolean>;
 
   // Todo operations
@@ -18,6 +23,21 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
   async getFeeds(): Promise<CalendarFeed[]> {
     return await db.select().from(calendarFeeds);
   }
@@ -27,7 +47,7 @@ export class DatabaseStorage implements IStorage {
     return feed;
   }
 
-  async createFeed(feed: InsertCalendarFeed): Promise<CalendarFeed> {
+  async createFeed(feed: InsertCalendarFeed & { userId: number }): Promise<CalendarFeed> {
     const [newFeed] = await db.insert(calendarFeeds).values(feed).returning();
     return newFeed;
   }
