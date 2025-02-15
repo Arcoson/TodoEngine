@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { insertCalendarFeedSchema, insertTodoSchema } from "@shared/schema";
-import { parseCalendarUrl } from "@shared/ical";
+import { z } from "zod";
+import { parseCalendarUrl } from "../client/src/lib/ical";
 
 export async function registerRoutes(app: Express) {
   // Calendar Feed Routes
@@ -35,7 +36,6 @@ export async function registerRoutes(app: Express) {
 
       res.json(feed);
     } catch (error) {
-      console.error('Failed to parse calendar feed:', error);
       res.status(400).json({ error: "Failed to parse calendar feed" });
     }
   });
