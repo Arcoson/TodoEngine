@@ -5,6 +5,8 @@ import { insertCalendarFeedSchema, insertTodoSchema } from "@shared/schema";
 import { z } from "zod";
 import { parseCalendarUrl } from "../client/src/lib/ical";
 import { setupAuth } from "./auth";
+import { setupWebSocket } from "./websocket";
+import { SyncService } from "./sync-service";
 
 // Middleware to check if user is authenticated
 const isAuthenticated = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
@@ -17,6 +19,13 @@ const isAuthenticated = (req: Express.Request, res: Express.Response, next: Expr
 export async function registerRoutes(app: Express) {
   // Set up authentication routes
   setupAuth(app);
+
+  const httpServer = createServer(app);
+  const { notifyUserOfChanges } = setupWebSocket(httpServer);
+
+  // Initialize sync service
+  const syncService = new SyncService(notifyUserOfChanges);
+  syncService.start();
 
   // Protected Calendar Feed Routes
   app.get("/api/feeds", isAuthenticated, async (req, res) => {
@@ -33,23 +42,13 @@ export async function registerRoutes(app: Express) {
     }
 
     try {
-      const events = await parseCalendarUrl(result.data.url);
       const feed = await storage.createFeed({
         ...result.data,
         userId: req.user!.id,
       });
 
-      // Create todos from events
-      for (const event of events) {
-        await storage.createTodo({
-          title: event.summary,
-          description: event.description,
-          dueDate: event.start,
-          completed: false,
-          feedId: feed.id,
-          eventUid: event.uid,
-        });
-      }
+      // Trigger immediate sync for the new feed
+      await syncService.syncFeed(feed.id);
 
       res.json(feed);
     } catch (error) {
@@ -112,6 +111,5 @@ export async function registerRoutes(app: Express) {
     res.json(updated);
   });
 
-  const httpServer = createServer(app);
   return httpServer;
 }
