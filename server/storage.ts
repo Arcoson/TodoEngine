@@ -1,4 +1,6 @@
-import { CalendarFeed, Todo, InsertCalendarFeed, InsertTodo } from "@shared/schema";
+import { calendarFeeds, todos, type CalendarFeed, type Todo, type InsertCalendarFeed, type InsertTodo } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Calendar Feed operations
@@ -15,67 +17,62 @@ export interface IStorage {
   deleteTodo(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private feeds: Map<number, CalendarFeed>;
-  private todos: Map<number, Todo>;
-  private feedId: number = 1;
-  private todoId: number = 1;
-
-  constructor() {
-    this.feeds = new Map();
-    this.todos = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getFeeds(): Promise<CalendarFeed[]> {
-    return Array.from(this.feeds.values());
+    return await db.select().from(calendarFeeds);
   }
 
   async getFeed(id: number): Promise<CalendarFeed | undefined> {
-    return this.feeds.get(id);
+    const [feed] = await db.select().from(calendarFeeds).where(eq(calendarFeeds.id, id));
+    return feed;
   }
 
   async createFeed(feed: InsertCalendarFeed): Promise<CalendarFeed> {
-    const id = this.feedId++;
-    const newFeed = { ...feed, id };
-    this.feeds.set(id, newFeed);
+    const [newFeed] = await db.insert(calendarFeeds).values(feed).returning();
     return newFeed;
   }
 
   async deleteFeed(id: number): Promise<boolean> {
-    return this.feeds.delete(id);
+    const [deleted] = await db.delete(calendarFeeds).where(eq(calendarFeeds.id, id)).returning();
+    return !!deleted;
   }
 
   async getTodos(feedId?: number): Promise<Todo[]> {
-    const todos = Array.from(this.todos.values());
     if (feedId !== undefined) {
-      return todos.filter(todo => todo.feedId === feedId);
+      return await db.select().from(todos).where(eq(todos.feedId, feedId));
     }
-    return todos;
+    return await db.select().from(todos);
   }
 
   async getTodo(id: number): Promise<Todo | undefined> {
-    return this.todos.get(id);
+    const [todo] = await db.select().from(todos).where(eq(todos.id, id));
+    return todo;
   }
 
   async createTodo(todo: InsertTodo): Promise<Todo> {
-    const id = this.todoId++;
-    const newTodo = { ...todo, id };
-    this.todos.set(id, newTodo);
+    const [newTodo] = await db.insert(todos).values({
+      ...todo,
+      dueDate: todo.dueDate ? new Date(todo.dueDate) : null,
+    }).returning();
     return newTodo;
   }
 
   async updateTodo(id: number, todo: Partial<InsertTodo>): Promise<Todo | undefined> {
-    const existing = this.todos.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...todo };
-    this.todos.set(id, updated);
+    const [updated] = await db
+      .update(todos)
+      .set({
+        ...todo,
+        dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
+      })
+      .where(eq(todos.id, id))
+      .returning();
     return updated;
   }
 
   async deleteTodo(id: number): Promise<boolean> {
-    return this.todos.delete(id);
+    const [deleted] = await db.delete(todos).where(eq(todos.id, id)).returning();
+    return !!deleted;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
