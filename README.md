@@ -50,23 +50,6 @@ The project uses:
 - TanStack Query for data fetching
 - WebSocket for real-time updates
 
-## Project Structure
-
-```
-├── client/             # Frontend code
-│   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── lib/
-│   │   └── pages/
-├── server/            # Backend code
-│   ├── auth.ts       # Authentication logic
-│   ├── routes.ts     # API routes
-│   └── storage.ts    # Database operations
-└── shared/           # Shared types and schemas
-    └── schema.ts
-```
-
 ## Scripts
 
 - `npm run dev` - Start development server
