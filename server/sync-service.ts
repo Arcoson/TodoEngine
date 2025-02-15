@@ -49,12 +49,13 @@ export class SyncService {
         const existingTodo = todos.find(todo => todo.eventUid === event.uid);
 
         if (!existingTodo) {
-          // New event, create todo
+          // New event, create todo with default medium priority
           await storage.createTodo({
             title: event.summary,
             description: event.description || "",
             dueDate: event.start,
             completed: false,
+            priority: "medium", // Default priority for new todos
             feedId: feed.id,
             eventUid: event.uid,
           });
@@ -64,11 +65,13 @@ export class SyncService {
           existingTodo.title !== event.summary ||
           existingTodo.description !== event.description
         ) {
-          // Event updated, update todo
+          // Event updated, update todo but maintain existing priority
           await storage.updateTodo(existingTodo.id, {
             title: event.summary,
             description: event.description || "",
             dueDate: event.start,
+            // Keep existing priority
+            priority: existingTodo.priority,
           });
           console.log(`Updated todo for event: ${event.summary}`);
         }
