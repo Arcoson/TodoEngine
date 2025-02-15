@@ -1,0 +1,75 @@
+# TodoEngine
+
+A modern web application that transforms calendar subscription links into actionable todo lists with robust user authentication and real-time synchronization.
+
+## Features
+
+- User authentication
+- Calendar feed integration
+- Real-time todo synchronization
+- Todo prioritization
+- Responsive design
+
+## Prerequisites
+
+- Node.js 20.x or higher
+- PostgreSQL database
+
+## Setup
+
+1. Clone the repository
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables by creating a `.env` file:
+```env
+DATABASE_URL=postgresql://your_username:your_password@localhost:5432/your_database
+```
+
+4. Push the database schema:
+```bash
+npm run db:push
+```
+
+5. Start the development server:
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5000`.
+
+## Development
+
+The project uses:
+- TypeScript + React for the frontend
+- Express.js for the backend
+- PostgreSQL with Drizzle ORM
+- shadcn/ui components
+- TanStack Query for data fetching
+- WebSocket for real-time updates
+
+## Project Structure
+
+```
+├── client/             # Frontend code
+│   ├── src/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   └── pages/
+├── server/            # Backend code
+│   ├── auth.ts       # Authentication logic
+│   ├── routes.ts     # API routes
+│   └── storage.ts    # Database operations
+└── shared/           # Shared types and schemas
+    └── schema.ts
+```
+
+## Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run db:push` - Push database schema changes
