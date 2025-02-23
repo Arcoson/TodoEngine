@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import createMemoryStore from "memorystore";
 
+
 const MemoryStore = createMemoryStore(session);
 const scryptAsync = promisify(scrypt);
 
