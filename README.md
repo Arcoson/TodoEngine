@@ -2,14 +2,6 @@
 
 A modern web application that transforms calendar subscription links into actionable todo lists with robust user authentication and real-time synchronization.
 
-## Features
-
-- User authentication
-- Calendar feed integration
-- Real-time todo synchronization
-- Todo prioritization
-- Responsive design
-
 ## Prerequisites
 
 - Node.js 20.x or higher
@@ -39,16 +31,6 @@ npm run dev
 ```
 
 The application will be available at `http://localhost:5000`.
-
-## Development
-
-The project uses:
-- TypeScript + React for the frontend
-- Express.js for the backend
-- PostgreSQL with Drizzle ORM
-- shadcn/ui components
-- TanStack Query for data fetching
-- WebSocket for real-time updates
 
 ## Scripts
 
